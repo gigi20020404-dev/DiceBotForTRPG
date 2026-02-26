@@ -286,7 +286,7 @@ class DiceCog(commands.Cog):
             repeat_count = min(max(repeat_count, 1), 10) 
             processing_text = repeat_match.group(2).strip()
 
-        # --- 第三步：定義純淨的正則表達式 ---
+        # --- 第三步：定義各擲骰指令的正則表達式 ---
         madness_pattern = r"^(CCRT|CCSU)(?:\s+(.+))?"  
         cc_pattern = r"^CC([BP][12])?\s*(\d+)(\s.*)?"
         sc_pattern = r"^\.sc\s*(\d+)\s+([^/]+)/(.+)"
@@ -339,10 +339,10 @@ class DiceCog(commands.Cog):
             
             # 準備頻道內的公開提示訊息
             if message.author in target_users and len(target_users) == 1:
-                # 情況 A：只有傳給自己 (傳統暗骰)
+                # 情況 A：只有傳給自己
                 msg = f"{author_mention} 進行了暗骰"
             else:
-                # 情況 B：傳給別人 (遞紙條模式)
+                # 情況 B：傳給別人
                 target_str = " ".join(success_mentions)
                 msg = f"{author_mention} 進行了暗骰，目標為：{target_str} "
 

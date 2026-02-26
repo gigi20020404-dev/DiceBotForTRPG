@@ -13,103 +13,85 @@ class FunCog(commands.Cog):
         if message.author == self.bot.user:
             return
 
-        original_text = message.content
-        processing_text = original_text.strip()
+        processing_text = message.content.strip()
         author_mention = message.author.mention
 
-        # --- 第一步：攔截暗骰與指定對象 (與 COCdice 保持一致) ---
-        is_secret = False
-        target_users = set()
-
-        if processing_text.lower().startswith("dr"):
-            is_secret = True
-            processing_text = processing_text[2:].strip()
-
-            for user in message.mentions:
-                if not user.bot:
-                    target_users.add(user)
-            for role in message.role_mentions:
-                for member in role.members:
-                    if not member.bot:
-                        target_users.add(member)
-            if not target_users:
-                target_users.add(message.author)
-
-            # 清除指令中的標記代碼，避免干擾選項
-            processing_text = re.sub(r'<@&?\d+>', '', processing_text).strip()
-
-        # --- 第二步：定義娛樂指令的正則表達式 ---
-        # 隨機(\d*) 可以同時匹配 "隨機" (數字為空) 和 "隨機3" (數字為3)
-        random_pattern = r"^隨機(\d*)\s+(.+)"
-        shuffle_pattern = r"^排列\s+(.+)"
-
-        title = ""
-        pool_str = ""
-        result_str = ""
-
-        # --- 第三步：分流處理 ---
-        if match := re.match(random_pattern, processing_text):
-            count_str = match.group(1)
-            options = match.group(2).split()
+        # -------------------------
+        # 指令 1：隨機顏色
+        # -------------------------
+        match_color = re.match(r"^(.*?)隨機顏色\s*$", processing_text)
+        if match_color:
+            remark = match_color.group(1).strip()
+            # 如果有備註就顯示備註，沒有就顯示預設標題
+            title = f"🎨 隨機顏色 ({remark})" if remark else "🎨 隨機顏色"
+            # 產生 0x000000 到 0xFFFFFF 之間的隨機整數
+            color_int = random.randint(0, 0xFFFFFF)
+            # 轉成 6 位數的 hex 字串 (例如: 1a2b3c)
+            color_hex = f"{color_int:06x}"
             
-            # 如果沒有輸入數字，預設抽 1 個
-            count = int(count_str) if count_str else 1
-            # 防呆機制：抽取數量不能小於 1，且不能超過選項的總數量
-            count = max(1, min(count, len(options)))
+            # 建立 Embed，並直接將側邊色條設定為抽出來的顏色！
+            embed = discord.Embed(
+                title=title,
+                description=f"**HEX色碼:** `#{color_hex.upper()}`",
+                color=discord.Color(color_int)
+            )
             
-            # random.sample 可以從列表中抽出不重複的多個項目
-            chosen = random.sample(options, count)
+            # 利用免費的 singlecolorimage API 產生 200x200 的純色圖卡，並設為縮圖
+            image_url = f"https://singlecolorimage.com/get/{color_hex}/200x200"
+            embed.set_thumbnail(url=image_url)
             
-            title = f"隨機抽選 ({count}項)"
-            pool_str = "、".join(options)
-            result_str = "、".join(chosen)
-
-        elif match := re.match(shuffle_pattern, processing_text):
-            options = match.group(1).split()
-            pool_str = "、".join(options)
-            
-            # 打亂列表順序
-            random.shuffle(options)
-            
-            title = "隨機排列"
-            result_str = " ➡️ ".join(options)
-
-        # 如果都不是娛樂指令，直接結束
-        if not title:
+            await message.channel.send(content=author_mention, embed=embed)
             return
 
-        # --- 第四步：包裝成Embed ---
-        embed = discord.Embed(color=discord.Color.green(), title=f"🎲 {title}")
-        embed.set_author(name=f"{message.author.display_name} 的娛樂擲骰", icon_url=message.author.display_avatar.url)
-        embed.add_field(name="選項池", value=pool_str, inline=False)
-        embed.add_field(name="最終結果", value=f"🎉 **{result_str}**", inline=False)
-
-        # --- 第五步：發送結果 (處理暗骰與明骰) ---
-        if is_secret:
-            success_mentions = []
-            failed_mentions = []
+        # -------------------------
+        # 指令 2：隨機 / 隨機x
+        # -------------------------
+        # ^隨機(\d*) 捕捉「隨機」後面可選的數字；\s+(.+) 捕捉空格後面的所有選項
+        match_random = re.match(r"^(.*?)隨機(\d*)\s+(.+)", processing_text)
+        if match_random:
+            remark = match_random.group(1).strip()
+            count_str = match_random.group(2)
+            options = match_random.group(3).split()
+            # 如果沒有寫數字 (例如純打 "隨機")，預設就是抽 1 個；否則轉成整數
+            x = int(count_str) if count_str else 1
             
-            for target in target_users:
-                try:
-                    await target.send(embed=embed)
-                    success_mentions.append(target.mention)
-                except discord.Forbidden:
-                    failed_mentions.append(target.mention)
+            # 防呆機制：確保 x 最少是 1，且不能超過總選項的數量
+            x = max(1, min(x, len(options)))
             
-            if message.author in target_users and len(target_users) == 1:
-                msg = f"{author_mention} 進行了暗骰"
-            else:
-                target_str = " ".join(success_mentions)
-                msg = f"{author_mention} 進行了暗骰，目標為：{target_str}"
+            # random.sample 可以從陣列中抽出不重複的 x 個項目
+            chosen = random.sample(options, x)
 
-            if failed_mentions:
-                fail_str = " ".join(failed_mentions)
-                msg += f"\n❌ 無法傳送私訊給 {fail_str} (對方可能關閉了伺服器成員私訊功能)"
+            title = f"🎲 隨機抽選{x}項 ({remark})" if remark else f"🎲 隨機抽選 ({x} 項)"
+            
+            embed = discord.Embed(color=discord.Color.green(), title=title)
+            embed.add_field(name="所有選項", value=", ".join(options), inline=False)
+            embed.add_field(name=f"最終結果", value=", ".join(chosen), inline=False)
+            
+            await message.channel.send(content=author_mention, embed=embed)
+            return
 
-            await message.channel.send(msg)
-        else:
-            await message.channel.send(embed=embed)
+        # -------------------------
+        # 指令 3：排列
+        # -------------------------
+        match_shuffle = re.match(r"^(.*?)排列\s+(.+)", processing_text)
+        if match_shuffle:
+            remark = match_shuffle.group(1).strip()
+            options = match_shuffle.group(2).split()
+            
+            title = f"🔀 隨機排列 ({remark})" if remark else "🔀 隨機排列"
+            
+            # random.shuffle 會直接把原本的陣列順序打亂
+            random.shuffle(options)
+            
+            # 將打亂後的陣列加上編號，並用換行符號組合 (1. 蘋果 \n 2. 香蕉)
+            result_text = " → ".join([f"{opt}" for i, opt in enumerate(options)])
+            
+            embed = discord.Embed(color=discord.Color.orange(), title=title)
+            embed.description = result_text
+            
+            await message.channel.send(content=author_mention, embed=embed)
+            return
 
-
+# 用來載入 Cog 的非同步函數
 async def setup(bot):
     await bot.add_cog(FunCog(bot))

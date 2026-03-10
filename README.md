@@ -5,7 +5,7 @@ Discord用跑團骰子機器人，目前以COC 7th為主要開發方向
 ### COC7擲骰
 #### 一般擲骰
 
-`xDy` 擲x個y面骰
+`xDy` 擲x個y面骰，支持基本四則運算
 
 #### 檢定擲骰
 
@@ -27,9 +27,9 @@ Discord用跑團骰子機器人，目前以COC 7th為主要開發方向
 #### 成長檢定
 以下兩種方式皆可
 
-`.dpx y z`
+`.dp x y z`
 
-`.dpx 技能A y 技能B z 技能C`
+`.dp 技能A x 技能B y 技能C z`
 
 #### san check檢定
 
